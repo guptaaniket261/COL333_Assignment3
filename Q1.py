@@ -27,7 +27,7 @@ class Taxi_MDP:
   +---------+
 
   """
-        
+  # (0, 0) is at top left
   # Taxi Start Position, T = (x,y)
   # Passenger Initial position, P = (a,b)
   # Passenger Destination, D = (p,q)
