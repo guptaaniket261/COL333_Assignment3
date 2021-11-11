@@ -240,6 +240,52 @@ class Taxi_MDP:
 				# print(transitions)
 				print(decode(new_state))
 				return transitions[i], self.R[self.currState][action]
+
+
+class Policy:
+	def __init__(self):
+		return
+
+	def value_iteration(self, MDP, epsilon, discount):
+		old_utilities = {state : 0 for state in MDP.states}
+		new_utilities = {state : 0 for state in MDP.states}
+		delta = 0
+		converged = False
+		policy = {state : -1 for state in MDP.states}
+		while(not converged):
+			for state in MDP.states:
+				old_utilities[state] = new_utilities[state]
+			delta = 0
+			for state in MDP.states:
+				new_utilities[state] = -np.inf
+				for a in MDP.A:
+					action = MDP.A[a]
+					temp_utility = 0
+					for prob, neighbour in MDP.P[state][action]:
+						temp_utility += prob*(MDP.R[state][action] + discount*old_utilities[neighbour])
+					new_utilities[state] = max(temp_utility, new_utilities[state])
+				delta = max(delta, abs(new_utilities[state] - old_utilities[state]))
+			if delta < epsilon:
+				converged = True
+		
+		
+		for state in MDP.states:
+			optimal_utility = 0
+			for a in MDP.A:
+				action = MDP.A[a]
+				temp_utility = 0
+				for prob, neighbour in MDP.P[state][action]:
+					temp_utility += prob*(MDP.R[state][action] + discount*old_utilities[neighbour])
+				if temp_utility > optimal_utility:
+					optimal_utility = temp_utility
+					policy[state] = action
+		return policy
+
+
+		
+
+
+
 		
 
 def main():
