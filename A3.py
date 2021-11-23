@@ -44,8 +44,8 @@ class Taxi_MDP:
     #           5: Putdown
 
 	def __init__(self, T = (1,0), P_pos = (0,0), D = (0,4)):
-		p_locs = [(0,0),(0,4),(4,0),(4,3)]
-		if P_pos not in p_locs or D not in p_locs:
+		self.p_locs = [(0,0),(0,4),(4,0),(4,3)]
+		if P_pos not in self.p_locs or D not in self.p_locs:
 			raise 0
 
 		self.num_rows = 5
@@ -99,21 +99,12 @@ class Taxi_MDP:
 				n_col2 = min(col_t+1,num_cols-1)
 			if goLeft(row_t,col_t):
 				n_col3 = max(col_t-1,0)
-			if inside_taxi == 1:
-				new_state0 = encode(n_row0, n_col0, n_row0, n_col0, 1)
-				new_state1 = encode(n_row1, n_col1, n_row1, n_col1, 1)
-				new_state2 = encode(n_row2, n_col2, n_row2, n_col2, 1)
-				new_state3 = encode(n_row3, n_col3, n_row3, n_col3, 1)
-			else:
-				new_state0 = encode(row_p, col_p, n_row0, n_col0, 0)
-				new_state1 = encode(row_p, col_p, n_row1, n_col1, 0)
-				new_state2 = encode(row_p, col_p, n_row2, n_col2, 0)
-				new_state3 = encode(row_p, col_p, n_row3, n_col3, 0)
-			# if state == self.startState:
-			# 	print(decode(new_state0))
-			# 	print(decode(new_state1))
-			# 	print(decode(new_state2))
-			# 	print(decode(new_state3))
+			
+			new_state0 = encode(n_row0, n_col0, n_row0, n_col0, inside_taxi)
+			new_state1 = encode(n_row1, n_col1, n_row1, n_col1, inside_taxi)
+			new_state2 = encode(n_row2, n_col2, n_row2, n_col2, inside_taxi)
+			new_state3 = encode(n_row3, n_col3, n_row3, n_col3, inside_taxi)
+		
 			for action in range(num_actions):
 				if action < 4:
 					same_state = False
@@ -250,6 +241,19 @@ class Taxi_MDP:
 				print(decode(new_state))
 				return transitions[i], self.R[self.currState][action]
 
+	def get_rand_start(self):
+		r = np.random.randint(low = 0, high = 4)
+		row_p, col_p = self.p_locs[r]
+		row_t = np.random.randint(low = 0, high = 4)
+		col_t = np.random.randint(low = 0, high = 4)
+		while row_t == row_p and col_p == col_t:
+			row_t = np.random.randint(low = 0, high = 4)
+			col_t = np.random.randint(low = 0, high = 4)	
+		inside_taxi = 0
+		start_state = encode(row_p, col_p, row_t, col_t, inside_taxi)
+		return start_state
+
+
 
 class Policy:
 	def __init__(self):
@@ -280,7 +284,7 @@ class Policy:
 		
 		for state in MDP.states:
 			optimal_utility = -np.inf
-			for a in MDP.A:
+			for a in MDP.A:   ## MDP.A = {"S": 0, "N": 1, "E": 2, "W": 3, "Pickup": 4, "Putdown": 5}
 				action = MDP.A[a]
 				temp_utility = 0
 				for prob, neighbour in MDP.P[state][action]:
@@ -359,6 +363,35 @@ class Policy:
 				converged = True			
 		
 		return utilities,improved_policy
+
+		def epsilon_greedy(action,epsilon):
+			r = np.random.rand()
+			if r < epsilon:
+				## Exploration
+				action = np.random.randint(low=0,high=6)
+			return action
+
+		def q_learning(self,MDP,policy,alpha,discount,epsilon,num_episodes):
+			q_table = {state: {action: 0 for action in range(6)} for state in MDP.states}
+			for episode in range(num_episodes):
+				state = MDP.get_rand_start() 
+				done = False
+				while not done:
+					action = epsilon_greedy(policy[state], epsilon)
+					transition, reward = MDP.step(action)   ## transition = prob, next_state
+					next_state = transition[1]
+					next_opt_action = max(MDP.P[next_state], key= lambda action: MDP.P[next_state][action])
+					td_update_sample = reward + discount * q_table[next_state][next_opt_action] 
+					q_table[state][action] = (1-alpha) * q_table[state][action] +  alpha * td_update_sample
+					if next_state == MDP.destState:
+						done = True
+					state = next_state
+
+			learned_policy = {state : -1 for state in MDP.states}
+			for state in MDP.states:
+				learned_policy[state] = max(MDP.q_table[state], key= lambda action: MDP.q_table[state][action])
+			return learned_policy
+
 
 		
 
