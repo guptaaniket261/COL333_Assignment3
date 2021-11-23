@@ -364,25 +364,29 @@ class Policy:
 		
 		return utilities,improved_policy
 
-		def epsilon_greedy(action,epsilon):
+		def epsilon_greedy(action,epsilon, iter_num, decaying_epsilon):
 			r = np.random.rand()
+			if decaying_epsilon:
+				epsilon = epsilon/iter_num
 			if r < epsilon:
 				## Exploration
 				action = np.random.randint(low=0,high=6)
 			return action
 
-		def q_learning(self,MDP,policy,alpha,discount,epsilon,num_episodes):
+		def q_learning(self,MDP,policy,alpha,discount,epsilon,num_episodes,decaying_epsilon = False):
 			q_table = {state: {action: 0 for action in range(6)} for state in MDP.states}
+			iteration = 1
 			for episode in range(num_episodes):
 				state = MDP.get_rand_start() 
 				done = False
 				while not done:
-					action = epsilon_greedy(policy[state], epsilon)
+					action = epsilon_greedy(policy[state], epsilon, iteration, decaying_epsilon)
 					transition, reward = MDP.step(action)   ## transition = prob, next_state
 					next_state = transition[1]
 					next_opt_action = max(MDP.P[next_state], key= lambda action: MDP.P[next_state][action])
 					td_update_sample = reward + discount * q_table[next_state][next_opt_action] 
 					q_table[state][action] = (1-alpha) * q_table[state][action] +  alpha * td_update_sample
+					iteration += 1
 					if next_state == MDP.destState:
 						done = True
 					state = next_state
