@@ -54,20 +54,29 @@ class Taxi_MDP:
 		self.startState = encode(P_pos[0], P_pos[1], T[0], T[1], 0)	
 		self.destState = encode(D[0], D[1], D[0], D[1], 0)
 		self.A = {"S": 0, "N": 1, "E": 2, "W": 3, "Pickup": 4, "Putdown": 5}
-		self.states = self.getStates()
+		self.states, self.state_index, self.index_state = self.getStates()
 		self.P, self.R = self.getModels()
 
 	def getStates(self):
 		states = []
+		state_index = {}
+		index_state = {}
+		counter = 0
 		for row_p in range(self.num_rows):
 			for col_p in range(self.num_cols):
-				# states.append(State(row_p, col_p, row_p, col_p, 1))
-				states.append(encode(row_p, col_p, row_p, col_p, 1))
+				state = encode(row_p, col_p, row_p, col_p, 1)
+				states.append(state)
+				state_index[state] = counter
+				index_state[counter] = state
+				counter += 1
 				for row_t in range(self.num_rows):
 					for col_t in range(self.num_cols):
-						states.append(encode(row_p, col_p, row_t, col_t, 0))
-						# states.append(State(row_p, col_p, row_t, col_t, 0))
-		return states
+						state = encode(row_p, col_p, row_t, col_t, 0)
+						states.append(state)
+						state_index[state] = counter
+						index_state[counter] = state
+						counter += 1
+		return states, state_index,index_state
 
 	def getModels(self):
 		P = dict()
@@ -270,7 +279,7 @@ class Policy:
 		
 		
 		for state in MDP.states:
-			optimal_utility = 0
+			optimal_utility = -np.inf
 			for a in MDP.A:
 				action = MDP.A[a]
 				temp_utility = 0
@@ -282,9 +291,74 @@ class Policy:
 		return policy
 
 
+	def policy_evaluation_linear(self, MDP, policy, discount):
+		num_states = len(MDP.states)
+		equations_LHS = [ [] for i in range(num_states) ]
+		equations_RHS = [0 for i in range(num_states)]
+		for state in MDP.states:
+			action = policy[state]
+			equation = [ 0 for j in range(num_states)]
+			equations[state_index[state]] = 1
+			for prob, next_state in MDP.P[state][action]:
+				equation[state_index[next_state]] = - prob * discount
+			equations_LHS[state_index[state]] = equation
+			equations_RHS[state_index[state]] = MDP.R[state][action]
+		vals = np.linalg.solve(equations_LHS,equations_RHS)
+		utilities = {index_state[i]: v for i,v in enumerate(vals)}
+		return utilities
+
+	def policy_evaluation_iterative(self, MDP, policy, discount, epsilon = 0.001):
+		converged = False
+		delta = 0
+		old_utilities = {state : 0 for state in MDP.states}
+		new_utilities = {state : 0 for state in MDP.states}
+		while(not converged):
+			delta = 0
+			old_utilities = new_utilities
+			for state in MDP.states:
+				action = policy[state]
+				temp_utility = 0
+				for prob, neighbour in MDP.P[state][action]:
+					temp_utility += prob*(MDP.R[state][action] + discount*old_utilities[neighbour])
+				new_utilities[state] = temp_utility
+				delta = max(delta, new_utilities-old_utilities)
+			if delta < epsilon:
+				converged = True
+		return new_utilities
+
+	def policy_iteration(self, MDP, policy, discount, epsilon = 0.001, iterative = 0):
+		utilities = {state : 0 for state in MDP.states}
+		improved_policy = policy
+		converged = False
+		iteration = 0
+		while(not converged):
 		
+			policy = improved_policy
+			iteration += 1
+			print("Iteration: " + str(iteration))
 
+			## Policy Evaluation ##
+			if iterative:
+				utilities = policy_evaluation_iterative(MDP,policy,discount,epsilon)
+			else:
+				utilities = policy_evaluation_linear(MDP,policy,discount)
 
+			## Policy Improvement ##
+			for state in MDP.states:
+				optimal_utility = -np.inf
+				for a in MDP.A:
+					action = MDP.A[a]
+					temp_utility = 0
+					for prob, neighbour in MDP.P[state][action]:
+						temp_utility += prob*(MDP.R[state][action] + discount*utilities[neighbour])
+					if temp_utility > optimal_utility:
+						optimal_utility = temp_utility
+						improved_policy[state] = action
+			
+			if policy == improved_policy:
+				converged = True			
+		
+		return utilities,improved_policy
 
 		
 
