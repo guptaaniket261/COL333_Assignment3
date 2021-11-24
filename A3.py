@@ -1,4 +1,5 @@
 import numpy as np
+import time
 
 def goLeft(r,c):
     bannedLeft = [(0,2),(1,2),(3,1),(3,3),(4,1),(4,3)]
@@ -259,7 +260,7 @@ class Policy:
 	def __init__(self):
 		return
 
-	def value_iteration(self, MDP, epsilon, discount):
+	def value_iteration(self, MDP, epsilon, discount=0.9):
 		old_utilities = {state : 0 for state in MDP.states}
 		new_utilities = {state : 0 for state in MDP.states}
 		delta = 0
@@ -383,7 +384,7 @@ class Policy:
 					action = epsilon_greedy(policy[state], epsilon, iteration, decaying_epsilon)
 					transition, reward = MDP.step(action)   ## transition = prob, next_state
 					next_state = transition[1]
-					next_opt_action = max(MDP.P[next_state], key= lambda action: MDP.P[next_state][action])
+					next_opt_action = max(MDP.q_table[next_state], key= lambda action: MDP.q_table[next_state][action])
 					td_update_sample = reward + discount * q_table[next_state][next_opt_action] 
 					q_table[state][action] = (1-alpha) * q_table[state][action] +  alpha * td_update_sample
 					iteration += 1
@@ -422,10 +423,16 @@ class Policy:
 		
 
 def main():
-	a = Taxi_MDP()
-	a.step(0)
-	a.step(1)
-
+	mdp = Taxi_MDP()
+	policy = Policy()
+	epsilon = 0.00000001
+	start = time.time()
+	opt_policy = policy.value_iteration(mdp,epsilon)
+	end = time.time()
+	print()
+	print(end-start)
+	print(opt_policy)
+	
 if __name__ == "__main__":
     main()
 					
