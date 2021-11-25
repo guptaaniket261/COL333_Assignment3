@@ -309,7 +309,7 @@ class Policy:
 	def __init__(self):
 		return
 
-	def value_iteration(self, MDP, epsilon, discount):
+	def value_iteration(self, MDP, epsilon, discount=0.9):
 		old_utilities = {state : 0 for state in MDP.states}
 		new_utilities = {state : 0 for state in MDP.states}
 		delta = 0
@@ -430,7 +430,7 @@ class Policy:
 				# print(improved_policy)
 				converged = True			
 		
-		return utilities, improved_policy
+		return utilities,improved_policy
 
 	def epsilon_greedy(action,epsilon, iter_num, decaying_epsilon):
 		r = np.random.rand()
@@ -451,7 +451,7 @@ class Policy:
 				action = epsilon_greedy(policy[state], epsilon, iteration, decaying_epsilon)
 				transition, reward = MDP.step(action)   ## transition = prob, next_state
 				next_state = transition[1]
-				next_opt_action = max(MDP.P[next_state], key= lambda action: MDP.P[next_state][action])
+				next_opt_action = max(MDP.q_table[next_state], key= lambda action: MDP.q_table[next_state][action])
 				td_update_sample = reward + discount * q_table[next_state][next_opt_action] 
 				q_table[state][action] = (1-alpha) * q_table[state][action] +  alpha * td_update_sample
 				iteration += 1
@@ -513,14 +513,14 @@ def main():
 
 
 	temp_policy = {state : 0 for state in instance.states}
-	utilities, policy = policy_finder.policy_iteration(instance, temp_policy, 0.99, 1e-8, 0)
+	utilities, policy = policy_finder.policy_iteration(instance, temp_policy, 0.99, 1e-8, 1)
 	instance.simulate(policy)
 
 
 	# print(policy)
 	# a.step(0)
 	# a.step(1)
-
+	
 if __name__ == "__main__":
     main()
 					
