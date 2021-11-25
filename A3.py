@@ -374,23 +374,27 @@ class Policy:
 				action = np.random.randint(low=0,high=6)
 			return action
 
-		def q_learning(self,MDP,policy,alpha,discount,epsilon,num_episodes,decaying_epsilon = False):
+		def q_learning(self,MDP,policy,alpha,discount,epsilon=0.1,num_episodes=2000,decaying_epsilon = False, max_steps=500):
 			q_table = {state: {action: 0 for action in range(6)} for state in MDP.states}
 			iteration = 1
+			sum_rewards = 0
 			for episode in range(num_episodes):
 				state = MDP.get_rand_start() 
 				done = False
-				while not done:
+				num_steps = 0
+				while (not done) and num_steps < max_steps:
 					action = epsilon_greedy(policy[state], epsilon, iteration, decaying_epsilon)
 					transition, reward = MDP.step(action)   ## transition = prob, next_state
 					next_state = transition[1]
 					next_opt_action = max(MDP.q_table[next_state], key= lambda action: MDP.q_table[next_state][action])
 					td_update_sample = reward + discount * q_table[next_state][next_opt_action] 
 					q_table[state][action] = (1-alpha) * q_table[state][action] +  alpha * td_update_sample
+					sum_rewards += td_update_sample
 					iteration += 1
 					if next_state == MDP.destState:
 						done = True
 					state = next_state
+					num_steps += 1
 
 			learned_policy = {state : -1 for state in MDP.states}
 			for state in MDP.states:
@@ -398,13 +402,14 @@ class Policy:
 			return learned_policy
 
 
-		def SARSA(self,MDP,policy,alpha,discount,epsilon,num_episodes,decaying_epsilon = False):
+		def SARSA(self,MDP,policy,alpha,discount,epsilon=0.1,num_episodes=2000,decaying_epsilon = False,max_steps=500):
 			q_table = {state: {action: 0 for action in range(6)} for state in MDP.states}
 			iteration = 1
 			for episode in range(num_episodes):
 				state = MDP.get_rand_start() 
 				done = False
-				while not done:
+				num_steps = 0
+				while (not done) and num_steps < max_steps:
 					action = epsilon_greedy(policy[state], epsilon, iteration, decaying_epsilon)
 					transition, reward = MDP.step(action)   ## transition = prob, next_state
 					next_state = transition[1]
@@ -415,6 +420,7 @@ class Policy:
 					if next_state == MDP.destState:
 						done = True
 					state = next_state
+					num_steps += 1
 
 			learned_policy = {state : -1 for state in MDP.states}
 			for state in MDP.states:
