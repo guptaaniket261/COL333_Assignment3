@@ -32,6 +32,24 @@ def equal(dict1, dict2):
 
 # print(decode(encode(1,2,3,4,9)))
 
+def evaluate(q_table, states, batch_size, discount):
+	disc_sum_rewards = []
+	learned_policy = {state : -1 for state in states}
+	for state in states:
+		learned_policy[state] = max(q_table[state], key= lambda action: q_table[state][action])
+	for i in range(batch_size):
+		test_mdp = Taxi_MDP()  #### add start state if needed
+		test_mdp.get_rand_start()
+		rewards = test_mdp.simulate(learned_policy,verbose = False)
+		disc_sum_reward = 0
+		factor = 1
+		for j in range(len(rewards)):
+			disc_sum_reward += factor*rewards[j]
+			factor *= discount
+		disc_sum_rewards.append(disc_sum_reward)
+	averaged_sum = sum(disc_sum_rewards) / batch_size
+	return averaged_sum
+
 class State:
 
 	def __init__(self, row_p, col_p, row_t, col_t, inside_taxi):
@@ -273,10 +291,12 @@ class Taxi_MDP:
 				self.currState = transitions[i][1]
 				
 				# print(decode(new_state))
-				return transitions[i][0], reward
+				#return transitions[i][0], reward
+				return transitions[i], reward ########## CHANGED: CHANGE1 #############
 
-	def simulate(self, policy):
+	def simulate(self, policy,verbose=True):
 		steps = 0
+		rewards = []
 		A = {0 :"S", 1: "N", 2: "E", 3: "W", 4: "Pickup", 5: "Putdown"}
 		while(self.currState !=self.destState):
 			if steps > 30:
@@ -285,13 +305,16 @@ class Taxi_MDP:
 			prev_state = self.currState
 			prev_Px, prev_Py, prev_Tx, prev_Ty, inside_taxi = decode(prev_state)
 			prev_P, prev_T = (prev_Px, prev_Py), (prev_Tx, prev_Ty)
-			prob, reward = self.step(policy[prev_state])
+			transition, reward = self.step(policy[prev_state])  ### transition = prob, next_state
+			prob = transition[0]   ## CHANGE1 
 			new_state = self.currState
 			new_Px, new_Py, new_Tx, new_Ty, n_inside_taxi = decode(new_state)
 			new_P , new_T = (new_Px, new_Py), (new_Tx, new_Ty)
 			action_taken = A[policy[prev_state]]
-			print("CurrTaxi: {0}, CurrPass: {1}, Inside:{2}, action: {3}, prob: {4}, reward: {5}, NewTaxi: {6}, NewPass: {7}, Inside:{8}".format(prev_T, prev_P, inside_taxi, action_taken, prob, reward,new_T, new_P, n_inside_taxi ))
-		return
+			if verbose:
+				print("CurrTaxi: {0}, CurrPass: {1}, Inside:{2}, action: {3}, prob: {4}, reward: {5}, NewTaxi: {6}, NewPass: {7}, Inside:{8}".format(prev_T, prev_P, inside_taxi, action_taken, prob, reward,new_T, new_P, n_inside_taxi ))
+			rewards.append(reward)
+		return rewards
 
 	def get_rand_start(self):
 		r = np.random.randint(low = 0, high = 4)
@@ -303,6 +326,8 @@ class Taxi_MDP:
 			col_t = np.random.randint(low = 0, high = 4)	
 		inside_taxi = 0
 		start_state = encode(row_p, col_p, row_t, col_t, inside_taxi)
+		self.startState = start_state
+		self.currState = start_state
 		return start_state
 
 class Policy:
@@ -432,7 +457,7 @@ class Policy:
 		
 		return utilities,improved_policy
 
-	def epsilon_greedy(action,epsilon, iter_num, decaying_epsilon):
+	def epsilon_greedy(self,action,epsilon, iter_num, decaying_epsilon):
 		r = np.random.rand()
 		if decaying_epsilon:
 			epsilon = epsilon/iter_num
@@ -441,27 +466,36 @@ class Policy:
 			action = np.random.randint(low=0,high=6)
 		return action
 
-	def q_learning(self,MDP,policy,alpha,discount,epsilon,num_episodes,decaying_epsilon = False):
+	def q_learning(self,MDP,policy,alpha,discount,epsilon,num_episodes=2000,decaying_epsilon = False,max_steps = 500):
 		q_table = {state: {action: 0 for action in range(6)} for state in MDP.states}
 		iteration = 1
+		rewards = []
+		episodes = []
 		for episode in range(num_episodes):
 			state = MDP.get_rand_start() 
 			done = False
-			while not done:
-				action = epsilon_greedy(policy[state], epsilon, iteration, decaying_epsilon)
-				transition, reward = MDP.step(action)   ## transition = prob, next_state
-				next_state = transition[1]
-				next_opt_action = max(MDP.q_table[next_state], key= lambda action: MDP.q_table[next_state][action])
+			num_steps = 0
+			while (not done) and num_steps < max_steps:
+				action = self.epsilon_greedy(policy[state], epsilon, iteration, decaying_epsilon)
+				transition, reward = MDP.step(action)   ## prob,reward
+				next_state = transition[1]   ## same as MDP.currState
+				next_opt_action = max(q_table[next_state], key= lambda action: q_table[next_state][action])
 				td_update_sample = reward + discount * q_table[next_state][next_opt_action] 
 				q_table[state][action] = (1-alpha) * q_table[state][action] +  alpha * td_update_sample
 				iteration += 1
 				if next_state == MDP.destState:
 					done = True
 				state = next_state
-
+				num_steps += 1
+			##### Calculate discounted sum of rewards for this episode, averaged over 10 runs #####
+			curr_score = evaluate(q_table,MDP.states,10,discount)
+			rewards.append(curr_score)  
+			episodes.append(episode)
+		plt.plot(episodes,rewards)
+		plt.show()
 		learned_policy = {state : -1 for state in MDP.states}
 		for state in MDP.states:
-			learned_policy[state] = max(MDP.q_table[state], key= lambda action: MDP.q_table[state][action])
+			learned_policy[state] = max(q_table[state], key= lambda action: q_table[state][action])
 		return learned_policy
 
 
@@ -472,7 +506,7 @@ class Policy:
 			state = MDP.get_rand_start() 
 			done = False
 			while not done:
-				action = epsilon_greedy(policy[state], epsilon, iteration, decaying_epsilon)
+				action = self.epsilon_greedy(policy[state], epsilon, iteration, decaying_epsilon)
 				transition, reward = MDP.step(action)   ## transition = prob, next_state
 				next_state = transition[1]
 				next_action = policy[next_state]
@@ -513,9 +547,9 @@ def main():
 
 
 	temp_policy = {state : 0 for state in instance.states}
-	utilities, policy = policy_finder.policy_iteration(instance, temp_policy, 0.99, 1e-8, 1)
-	instance.simulate(policy)
-
+	# utilities, policy = policy_finder.policy_iteration(instance, temp_policy, 0.99, 1e-8, 1)
+	# instance.simulate(policy)
+	policy = policy_finder.q_learning(instance,temp_policy,0.25,0.99,1e-18)
 
 	# print(policy)
 	# a.step(0)
