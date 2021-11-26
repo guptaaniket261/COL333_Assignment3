@@ -311,6 +311,7 @@ class Taxi_MDP:
 		steps = 0
 		rewards = []
 		A = {0 :"S", 1: "N", 2: "E", 3: "W", 4: "Pickup", 5: "Putdown"}
+		self.currState = self.startState
 		while(self.currState !=self.destState):
 			if steps > 500:
 				break
@@ -438,12 +439,13 @@ class Policy:
 				converged = True
 		return new_utilities
 
-	def policy_iteration(self, MDP, temp_policy, discount, epsilon = 0.001, iterative = 0):
+	def policy_iteration(self, MDP, temp_policy, discount, epsilon = 1e-18, iterative = 0, calc_loss = False, opt_utilities = []):
 		utilities = {state : 0 for state in MDP.states}
 		improved_policy = temp_policy
 		converged = False
 		iteration = 0
-		while(not converged):
+		iterations, policy_losses = [], []
+		while(not converged) and iteration < 500:
 			policy = {state : improved_policy[state] for state in MDP.states}
 			iteration += 1
 			print("Iteration: " + str(iteration))
@@ -452,6 +454,15 @@ class Policy:
 				utilities = self.policy_evaluation_iterative(MDP, policy, discount, epsilon)
 			else:
 				utilities = self.policy_evaluation_linear(MDP, policy, discount)
+			if calc_loss:
+				U = list(utilities.values())
+				print(U[0])
+				U_opt = list(opt_utilities.values())
+				print(U_opt[0])
+				policy_loss = np.linalg.norm(np.subtract(U,U_opt))
+				print("Iteration: {0}, Policy Loss: {1}".format(iteration,policy_loss)) 
+				iterations.append(iteration)
+				policy_losses.append(policy_loss)
 
 			## Policy Improvement ##
 			for state in MDP.states:
@@ -468,11 +479,17 @@ class Policy:
 			# if iteration< 3:
 			# 	print(policy)
 			# 	print(improved_policy)
-			if equal(policy , improved_policy) or iteration > 50:
+			if equal(policy , improved_policy) or iteration > 550:
 				# print(policy)
 				# print(improved_policy)
 				converged = True			
-		
+		if calc_loss:
+			plt.title("Policy Loss vs No. of iterations, discount: {0} ".format(discount))
+			plt.xlabel("No. of iterations")
+			plt.ylabel("Policy Loss")
+			plt.plot(iterations,policy_losses)
+			plt.savefig("Pol_Iter_{0}".format(int(discount*100)))
+			plt.show()
 		return utilities,improved_policy
 
 	def epsilon_greedy(self,action,epsilon, iter_num, decaying_epsilon):
