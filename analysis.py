@@ -1,7 +1,7 @@
 import A3
 import time
 import matplotlib.pyplot as plt
-
+import numpy as np
 
 
 
@@ -60,6 +60,33 @@ def main():
                     instance.simulate(learned_policy)
                     policy = {state: 0 for state in instance.states}
                     utilities_after_eval,l_policy = policy_obj.policy_iteration(instance,policy,discount,iterative=1,calc_loss = True,opt_utilities = utilities)
+    if part == "B":
+        if ques_num == "2":
+            episodes = 2000
+            alpha = 0.25
+            discount = 0.99
+            print("Q Learning: ")
+            start = time.time()
+            temp_policy = {state : np.random.randint(low = 0 , high = 6) for state in instance.states}	
+            dest = (0, 4)
+            policy, utility = policy_obj.q_learning(dest,temp_policy, alpha=0.25, discount=0.99, epsilon=0.1, num_episodes=500, decaying_epsilon= False, max_steps= 500)
+            print()
+            # print("Simulation - ")
+            # instance.simulate(policy)
+            print("Time taken: ", time.time()-start)
+            print("\n")
+
+            print("Q Learning with decaying exploration: ")
+            start = time.time()
+
+
+        if ques_num == "3":
+            return
+        if ques_num == "4":
+            return
+        if ques_num == "5":
+            return
+        
 
 main()
 
