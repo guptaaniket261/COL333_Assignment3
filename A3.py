@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import time
+import sys
 
 def goLeft(r,c,bigger_grid):
 	bannedLeft = [(0,2),(1,2),(3,1),(3,3),(4,1),(4,3)]
@@ -35,17 +36,33 @@ def equal(dict1, dict2):
 			return False
 	return True
 
-# print(decode(encode(1,2,3,4,9)))
+def getRandStart(destination,bigger_grid = False):
+	n=5
+	if bigger_grid:
+		n=10
+	row_t = np.random.randint(low = 0, high = n)
+	col_t = np.random.randint(low = 0, high = n)
+	p_locs = [(0,0),(0,4),(4,0),(4,3)]
+	if bigger_grid:
+		p_locs = [ (0,0),(0,5),(0,8),(3,3),(4,6),(8,0),(9,4),(9,9) ]	
+	found = False
+	loc = (0, 0)
+	while( not found):
+		r = np.random.randint(low = 0, high = len(p_locs))
+		loc = p_locs[r]
+		if loc!=destination and loc!=(row_t, col_t):
+			break
+	return loc, (row_t, col_t)
 
-def evaluate(q_table, states, batch_size, discount):
+
+def evaluate(q_table, states, batch_size, discount, dest,bigger_grid = False):
 	disc_sum_rewards = []
 	learned_policy = {state : -1 for state in states}
 	for state in states:
 		learned_policy[state] = max(q_table[state], key= lambda action: q_table[state][action])
-	# print(learned_policy)
 	for i in range(batch_size):
-		test_mdp = Taxi_MDP() 
-		#test_mdp.get_rand_start()
+		p_loc, t_loc = getRandStart(dest)
+		test_mdp = Taxi_MDP(t_loc, p_loc, D = dest, bigger_grid=bigger_grid) 
 		rewards = test_mdp.simulate(learned_policy,verbose = False)
 		disc_sum_reward = 0
 		factor = 1
@@ -91,7 +108,7 @@ class Taxi_MDP:
 	#           4: Pickup
 	#           5: Putdown
 
-	def __init__(self, T = (1,0), P_pos = (0,0), D = (0,4), bigger_grid = False):
+	def __init__(self, T = (1,0), P_pos = (4,0), D = (0,4), bigger_grid = False):
 		self.p_locs = [(0,0),(0,4),(4,0),(4,3)]
 		self.num_rows = 5
 		self.num_cols = 5
@@ -101,7 +118,10 @@ class Taxi_MDP:
 			self.p_locs = [ (0,0),(0,5),(0,8),(3,3),(4,6),(8,0),(9,4),(9,9) ]
 			self.num_rows = 10
 			self.num_cols = 10
-			T, P_pos, D = (5,2), (0,0), (0,8)
+			if D == (0,4):
+				D = (0,8)
+			if P_pos == (4,0):
+				P_pos = (0,0)
 
 		if P_pos not in self.p_locs or D not in self.p_locs:
 			print("Starting and ending position must be among the given depots")
@@ -301,13 +321,9 @@ class Taxi_MDP:
 		for i in range(n_states):
 			if r < cum_probs[i]:
 				new_state = transitions[i][1] 
-				# print(self.currState, transitions)
 				reward = self.R[self.currState][action]
 				self.currState = transitions[i][1]
-				
-				# print(decode(new_state))
-				#return transitions[i][0], reward
-				return transitions[i], reward ########## CHANGED: CHANGE1 #############
+				return transitions[i], reward 
 
 	def simulate(self, policy,verbose=True):
 		steps = 0
@@ -333,6 +349,7 @@ class Taxi_MDP:
 			rewards.append(reward)
 		return rewards
 
+
 	def get_rand_start(self):
 		row_pd,col_pd, row_td,col_td,inside_taxi_d = decode(self.destState)
 		row_p,col_p = row_pd,col_pd
@@ -357,16 +374,11 @@ class Policy:
 		delta = 0
 		converged = False
 		policy = {state : -1 for state in MDP.states}
-		row_p, col_p, row_t, col_t, inside_taxi = decode(MDP.destState)
-		pre_destination = encode(row_p, col_p, row_t, col_t, 1)
-		# print(pre_destination)
 		iterations = 0
 		iter_array = []
 		max_norm_array = []
 		while(not converged):
 			iterations += 1
-			# print("Dest state utility: ", old_utilities[MDP.destState])
-			# print("PreDest state utility: ", old_utilities[pre_destination])
 			for state in MDP.states:
 				old_utilities[state] = new_utilities[state]
 			delta = 0
@@ -414,14 +426,17 @@ class Policy:
 			equation = [ 0 for j in range(num_states)]
 			equation[MDP.state_index[state]] = 1
 			for prob, next_state in MDP.P[state][action]:
-				equation[MDP.state_index[next_state]] = - prob * discount
+				if next_state == state:
+					equation[MDP.state_index[state]] += (-prob*discount)
+				else:
+					equation[MDP.state_index[next_state]] = - prob * discount
 			equations_LHS[MDP.state_index[state]] = equation
 			equations_RHS[MDP.state_index[state]] = MDP.R[state][action]
 		vals = np.linalg.solve(equations_LHS,equations_RHS)
 		utilities = {MDP.index_state[i]: v for i,v in enumerate(vals)}
 		return utilities
 
-	def policy_evaluation_iterative(self, MDP, policy, discount, epsilon = 0.001):
+	def policy_evaluation_iterative(self, MDP, policy, discount, epsilon = 1e-8):
 		converged = False
 		delta = 0
 		old_utilities = {state : 0 for state in MDP.states}
@@ -442,25 +457,35 @@ class Policy:
 		return new_utilities
 
 	def policy_iteration(self, MDP, temp_policy, discount, epsilon = 1e-18, iterative = 0, calc_loss = False, opt_utilities = []):
-		utilities = {state : 0 for state in MDP.states}
+		old_utilities = {state : 0 for state in MDP.states}
+		new_utilities = {state : 0 for state in MDP.states}
+		delta = 0		
 		improved_policy = temp_policy
 		converged = False
 		iteration = 0
 		iterations, policy_losses = [], []
+		print("\n")
+		print("Policy Iteration Method with discount {0}".format(discount))
 		while(not converged) and iteration < 500:
 			policy = {state : improved_policy[state] for state in MDP.states}
 			iteration += 1
-			print("Iteration: " + str(iteration))
+			for state in MDP.states:
+				old_utilities[state] = new_utilities[state]
+			delta = 0
 			## Policy Evaluation ##
 			if iterative == 1:
-				utilities = self.policy_evaluation_iterative(MDP, policy, discount, epsilon)
+				new_utilities = self.policy_evaluation_iterative(MDP, policy, discount, epsilon)
 			else:
-				utilities = self.policy_evaluation_linear(MDP, policy, discount)
+				new_utilities = self.policy_evaluation_linear(MDP, policy, discount)
+			for state in MDP.states:
+				delta = max(delta,abs(new_utilities[state] - old_utilities[state]))
+
+			if delta < epsilon:
+				converged = True
+
 			if calc_loss:
-				U = list(utilities.values())
-				print(U[0])
+				U = list(new_utilities.values())
 				U_opt = list(opt_utilities.values())
-				print(U_opt[0])
 				policy_loss = np.linalg.norm(np.subtract(U,U_opt))
 				print("Iteration: {0}, Policy Loss: {1}".format(iteration,policy_loss)) 
 				iterations.append(iteration)
@@ -473,26 +498,25 @@ class Policy:
 					action = MDP.A[a]
 					temp_utility = 0
 					for prob, neighbour in MDP.P[state][action]:
-						temp_utility += prob*(MDP.R[state][action] + discount*utilities[neighbour])
+						temp_utility += prob*(MDP.R[state][action] + discount*new_utilities[neighbour])
 					if temp_utility > optimal_utility:
 						optimal_utility = temp_utility
 						improved_policy[state] = action
 			
-			# if iteration< 3:
-			# 	print(policy)
-			# 	print(improved_policy)
 			if equal(policy , improved_policy) or iteration > 550:
-				# print(policy)
-				# print(improved_policy)
 				converged = True			
 		if calc_loss:
-			plt.title("Policy Loss vs No. of iterations, discount: {0} ".format(discount))
+			if iterative == 1:
+				plt.title("Policy Loss vs No. of iterations, discount: {0} using {1}".format(discount, "iterative method"))
+			else:
+				plt.title("Policy Loss vs No. of iterations, discount: {0} using {1}".format(discount, "linear algebra method"))
+			
 			plt.xlabel("No. of iterations")
 			plt.ylabel("Policy Loss")
 			plt.plot(iterations,policy_losses)
-			plt.savefig("Pol_Iter_{0}".format(int(discount*100)))
+			plt.savefig("Pol_Iter_{0}_{1}".format(int(discount*100), iterative))
 			plt.show()
-		return utilities,improved_policy
+		return new_utilities,improved_policy
 
 	def epsilon_greedy(self,action,epsilon, iter_num, decaying_epsilon):
 		r = np.random.rand()
@@ -504,31 +528,33 @@ class Policy:
 		return action
 
 	
-	def getRandStart(self, destination):
-		row_t = np.random.randint(low = 0, high = 5)
-		col_t = np.random.randint(low = 0, high = 5)
+	def getRandStart(self, destination, bigger_grid = False):
+		n = 5
+		if bigger_grid:
+			n=10
+		row_t = np.random.randint(low = 0, high = n)
+		col_t = np.random.randint(low = 0, high = n)
 		p_locs = [(0,0),(0,4),(4,0),(4,3)]
+		if bigger_grid:
+			p_locs = [ (0,0),(0,5),(0,8),(3,3),(4,6),(8,0),(9,4),(9,9) ]
 		found = False
 		loc = (0, 0)
 		while( not found):
-			r = np.random.randint(low = 0, high = 4)
+			r = np.random.randint(low = 0, high = len(p_locs))
 			loc = p_locs[r]
 			if loc!=destination:
 				break
 		return loc, (row_t, col_t)
 
 
-	def q_learning(self,dest,policy,alpha,discount,epsilon,num_episodes=500,decaying_epsilon = False,max_steps = 500):
-		# print(policy)
-		MDP = Taxi_MDP()
+	def q_learning(self,dest,policy,alpha,discount,epsilon,num_episodes = 2500, decaying_epsilon = False, max_steps = 500,bigger_grid=False):
+		MDP = Taxi_MDP(bigger_grid = bigger_grid)
 		q_table = {state: {action: 0 for action in range(6)} for state in MDP.states}
 		iteration = 1
 		rewards, episodes = [], []
-		for episode in range(num_episodes):
-			# state = MDP.get_rand_start() 
+		for episode in range(num_episodes): 
 			p_loc, t_loc = self.getRandStart(dest)
 			MDP = Taxi_MDP(t_loc, p_loc, dest)
-			# MDP.currState = MDP.startState
 			state = MDP.startState
 			done = False
 			num_steps = 0
@@ -537,51 +563,54 @@ class Policy:
 					print(episode)
 					break
 				action = self.epsilon_greedy(policy[state], epsilon, iteration, decaying_epsilon)
-				#print(action)
 				transition, reward = MDP.step(action)   ## transition = prob, next_state
 				next_state = transition[1]   ## same as MDP.currState
-				#print(next_state,reward)
-				# next_opt_action = max(q_table[next_state], key= lambda action: q_table[next_state][action])
 				next_opt_action = policy[next_state]
-				# print(q_table)
-				#print(next_opt_action)
 				td_update_sample = reward + discount * q_table[next_state][next_opt_action] 
 				q_table[state][action] = (1-alpha) * q_table[state][action] +  alpha * td_update_sample
 				iteration += 1
 				if next_state == MDP.destState:
 					done = True
-					# print("Reached")
 				state = next_state
 				num_steps += 1
-				# for state in MDP.states:
-					# policy[state] = max(q_table[state], key= lambda action: q_table[state][action])
 				policy[state] = max(q_table[state], key= lambda action: q_table[state][action])
 				
 			
 			####   Calculate discounted sum of rewards for this episode, averaged over 10 runs  #####
-			curr_score = evaluate(q_table,MDP.states,10,discount)
+			curr_score = evaluate(q_table, MDP.states, 10, discount, dest,bigger_grid)
 			rewards.append(curr_score)  
 			episodes.append(episode)
 
 		plt.plot(episodes, rewards)
+		plt.xlabel("No. of training episodes")
+		plt.ylabel("Accumulated Reward (averaged over 10 different runs)")
+		if decaying_epsilon:
+			plt.title("Q-learning with decaying exploration rate")
+			plt.savefig("q_learning_decay")
+		else:
+			plt.title("Q-learning with fixed exploration rate")
+			plt.savefig("q_learning")
 		plt.show()
+		
 		learned_policy = {state : -1 for state in MDP.states}
 		for state in MDP.states:
 			learned_policy[state] = max(q_table[state], key= lambda action: q_table[state][action])
-		utility = evaluate(q_table,MDP.states,10,discount)
-		# print(utility)		
+		utility = evaluate(q_table, MDP.states, 20, discount, dest,bigger_grid)
+		if decaying_epsilon:
+			print("Q Learning (decaying exploration rate) Utility: " + str(utility))
+		else:
+			print("Q Learning Utility: " + str(utility))					
 		return learned_policy, utility
 
-	def SARSA(self,dest,policy,alpha,discount,epsilon,num_episodes=2000,decaying_epsilon = False,max_steps=500):
-		MDP = Taxi_MDP()
+
+	def SARSA(self,dest,policy,alpha,discount,epsilon,num_episodes=1500,decaying_epsilon = False,max_steps=500,bigger_grid = False):
+		MDP = Taxi_MDP(bigger_grid=bigger_grid)
 		q_table = {state: {action: 0 for action in range(6)} for state in MDP.states}
 		iteration = 1
 		rewards, episodes = [], []
-		for episode in range(num_episodes):
-			# state = MDP.get_rand_start() 
-			p_loc, t_loc = self.getRandStart(dest)
-			MDP = Taxi_MDP(t_loc, p_loc, dest)
-			# MDP.currState = MDP.startState
+		for episode in range(num_episodes): 
+			p_loc, t_loc = self.getRandStart(dest,bigger_grid)
+			MDP = Taxi_MDP(t_loc, p_loc, dest,bigger_grid)
 			prev_state = MDP.startState
 			prev_action = self.epsilon_greedy(policy[prev_state], epsilon, iteration, decaying_epsilon)
 			transition, prev_reward = MDP.step(prev_action)
@@ -591,7 +620,7 @@ class Policy:
 			num_steps = 0
 			while (not done):
 				if num_steps>max_steps:
-					print(episode)
+					# print(episode)
 					break
 				if state == MDP.destState:
 					q_table[prev_state][prev_action] = (1-alpha) * q_table[prev_state][prev_action] +  alpha * prev_reward
@@ -607,77 +636,139 @@ class Policy:
 				prev_action = action
 				prev_reward = reward
 				state = next_state
-
-
-				# next_state = transition[1]   ## same as MDP.currState
-				# #print(next_state,reward)
-				# # next_opt_action = max(q_table[next_state], key= lambda action: q_table[next_state][action])
-				# next_opt_action = policy[next_state]
-				# # print(q_table)
-				# #print(next_opt_action)
-				# td_update_sample = reward + discount * q_table[next_state][next_opt_action] 
-				# q_table[state][action] = (1-alpha) * q_table[state][action] +  alpha * td_update_sample
-				# iteration += 1
-				# if next_state == MDP.destState:
-				# 	done = True
-					# print("Reached")
-				# state = next_state
 				num_steps += 1
-				# for state in MDP.states:
-					# policy[state] = max(q_table[state], key= lambda action: q_table[state][action])
-				policy[prev_state] = max(q_table[prev_state], key= lambda action: q_table[prev_state][action])
-				
+				policy[prev_state] = max(q_table[prev_state], key= lambda action: q_table[prev_state][action])				
 			
 			####   Calculate discounted sum of rewards for this episode, averaged over 10 runs  #####
-			curr_score = evaluate(q_table,MDP.states,10,discount)
+			curr_score = evaluate( q_table,MDP.states,10,discount, dest,bigger_grid)
 			rewards.append(curr_score)  
 			episodes.append(episode)
 
+		
 		plt.plot(episodes, rewards)
+		plt.xlabel("No. of training episodes")
+		plt.ylabel("Accumulated Reward (averaged over 10 different runs)")
+		if decaying_epsilon:
+			plt.title("SARSA with decaying exploration rate")
+			plt.savefig("sarsa_learning_decay")
+		else:
+			plt.title("SARSA with fixed exploration rate)")
+			plt.savefig("sarsa_learning")
 		plt.show()
 		learned_policy = {state : -1 for state in MDP.states}
 		for state in MDP.states:
 			learned_policy[state] = max(q_table[state], key= lambda action: q_table[state][action])
-		utility = evaluate(q_table,MDP.states,10,discount)
-		# print(utility)		
+		utility = evaluate(q_table,MDP.states,20,discount, dest,bigger_grid)
+		if decaying_epsilon:
+			print("SARSA (decaying exploration rate) Utility: " + str(utility))
+		else:
+			print("SARSA Utility: " + str(utility))		
 		return learned_policy, utility
-
-	# def SARSA(self,MDP,policy,alpha,discount,epsilon,num_episodes=2000,decaying_epsilon = False,max_steps=500):
-	# 	q_table = {state: {action: 0 for action in range(6)} for state in MDP.states}
-	# 	iteration = 1
-	# 	rewards = []
-	# 	episodes = []
-	# 	for episode in range(num_episodes):
-	# 		state = MDP.get_rand_start() 
-	# 		done = False
-	# 		num_steps = 0
-	# 		while (not done) and num_steps < max_steps:
-	# 			action = self.epsilon_greedy(policy[state], epsilon, iteration, decaying_epsilon)
-	# 			transition, reward = MDP.step(action)   ## transition = prob, next_state
-	# 			next_state = transition[1]
-	# 			next_action = policy[next_state]
-	# 			td_update_sample = reward + discount * q_table[next_state][next_action] 
-	# 			q_table[state][action] = (1-alpha) * q_table[state][action] +  alpha * td_update_sample
-	# 			iteration += 1
-	# 			if next_state == MDP.destState:
-	# 				done = True
-	# 			state = next_state
-	# 			num_steps+=1
-	# 			for state in MDP.states:
-	# 				policy[state] = max(q_table[state], key= lambda action: q_table[state][action])
-
-	# 		##### Calculate discounted sum of rewards for this episode, averaged over 10 runs #####
-	# 		# curr_score = evaluate(q_table,MDP.states,10,discount)
-	# 		# rewards.append(curr_score)  
-	# 		# episodes.append(episode)			
-
-	# 	learned_policy = {state : -1 for state in MDP.states}
-	# 	for state in MDP.states:
-	# 		learned_policy[state] = max(q_table[state], key= lambda action: q_table[state][action])
-	# 	return learned_policy
-		
+	
 
 def main():
+	args = sys.argv[1:]
+	print("Note: (0, 0) is at top left in our implementation")
+	policy_obj = Policy()
+	if args[0] == "A":
+		tx, ty = [int(i) for i in input("Enter coordinates for Taxi: ").strip().split()]
+		px, py = [int(i) for i in input("Enter coordinates for Passenger: ").strip().split()]
+		dx, dy = [int(i) for i in input("Enter coordinates for Destination: ").strip().split()]
+		if args[1] == "2":
+			if args[2] == "a":
+				MDP = Taxi_MDP((tx, ty), (px, py), (dx, dy))
+				policy = policy_obj.value_iteration(MDP,1e-12,0.9)
+				MDP.simulate(policy)
+
+			if args[2] == "b":
+				MDP = Taxi_MDP((tx, ty), (px, py), (dx, dy))
+				discounts = [0.01, 0.1, 0.5, 0.8, 0.99]
+				for discount in discounts:
+					policy = policy_obj.value_iteration(MDP, 1e-18, discount)
+
+			if args[2] == "c":
+				MDP1 = Taxi_MDP((tx, ty), (px, py), (dx, dy))
+				print("Discount : 0.1")
+				policy1 = policy_obj.value_iteration(MDP1, 1e-18, 0.1)
+				MDP2 = Taxi_MDP((tx, ty), (px, py), (dx, dy))
+				MDP1.simulate(policy1)
+				print("\n")
+
+				print("Discount : 0.99")
+				policy2 = policy_obj.value_iteration(MDP2, 1e-18, 0.99)
+				MDP2.simulate(policy2)
+			
+		if args[1] == "3":
+			if args[2] == "a":
+				print("Iterative Method: ")
+				MDP1 = Taxi_MDP((tx, ty), (px, py), (dx, dy))
+				temp_policy1 = {state : np.random.randint(low = 0 , high = 6) for state in MDP1.states}
+				utility, policy1 = policy_obj.policy_iteration(MDP1, temp_policy1, 0.99, 1e-18, 1)
+				MDP1.simulate(policy1)
+
+				print("\n")
+				print("Linear Algebra Method: ")
+				MDP2 = Taxi_MDP((tx, ty), (px, py), (dx, dy))
+				temp_policy2 = {state : np.random.randint(low = 0 , high = 6) for state in MDP2.states}
+				utility, policy2 = policy_obj.policy_iteration(MDP2, temp_policy2, 0.99, 1e-12, 1)
+				MDP2.simulate(policy2)
+
+
+			if args[2] == "b":
+				discounts = [0.01, 0.1, 0.5, 0.8, 0.99]
+				for discount in discounts:
+					MDP1 = Taxi_MDP((tx, ty), (px, py), (dx, dy))
+					policy = {state : np.random.randint(low = 0 , high = 6) for state in MDP1.states}
+					utilities, learned_policy = policy_obj.policy_iteration(MDP1, policy, discount, iterative=1)
+					
+					MDP2 = Taxi_MDP((tx, ty), (px, py), (dx, dy))
+					policy_iter = {state : np.random.randint(low = 0 , high = 6) for state in MDP1.states}
+					utility_iter, learned_policy_iter = policy_obj.policy_iteration(MDP2, policy_iter, discount, iterative=1, calc_loss = True, opt_utilities = utilities)
+					# MDP2.simulate(learned_policy_iter)
+
+					MDP3 = Taxi_MDP((tx, ty), (px, py), (dx, dy))
+					policy_linear = {state : np.random.randint(low = 0 , high = 6) for state in MDP1.states}
+					utility_linear, learned_policy_linear = policy_obj.policy_iteration(MDP3, policy_linear, discount, iterative=0, calc_loss = True, opt_utilities = utilities)
+					# MDP3.simulate(learned_policy_linear)
+
+	if args[0] == "B":
+		if args[1] == "2":
+			dest = (0, 0)
+			MDP = Taxi_MDP()
+
+			temp_policy = {state : np.random.randint(low = 0 , high = 6) for state in MDP.states}
+			policy, utility = policy_obj.q_learning(dest,temp_policy, 0.25, 0.99, 0.1, decaying_epsilon = False)
+			print("Accumulated reward with Q-learning (constant eps): ", utility)
+			print("\n")
+
+			temp_policy = {state : np.random.randint(low = 0 , high = 6) for state in MDP.states}
+			policy, utility = policy_obj.q_learning(dest,temp_policy, 0.25, 0.99, 0.1, decaying_epsilon = True)
+			print("Accumulated reward with Q-learning (decaying eps): ", utility)
+			print("\n")
+
+			temp_policy = {state : np.random.randint(low = 0 , high = 6) for state in MDP.states}
+			policy, utility = policy_obj.SARSA(dest, temp_policy, 0.25, 0.99, 0.1, decaying_epsilon = False)
+			print("Accumulated reward with SARSA (decaying eps): ", utility)
+			print("\n")
+
+			temp_policy = {state : np.random.randint(low = 0 , high = 6) for state in MDP.states}
+			policy, utility = policy_obj.SARSA(dest, temp_policy, 0.25, 0.99, 0.1, decaying_epsilon = True)
+			print("Accumulated reward with SARSA (decaying eps): ", utility)
+			print("\n")
+
+		if args[1] == "3":
+			pass
+		if args[1] == "4":
+			pass
+		if args[1] == "5":
+			pass
+		
+
+		
+
+
+
+
 	# a = Taxi_MDP()
 	# po = Policy()
 	# eps = [1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-18]
@@ -688,9 +779,9 @@ def main():
 	# for discount in discounts:
 	# 	policy = po.value_iteration(a, 1e-18, discount)
 	
-	T , P, D = (3,0), (4,0), (0,4)
-	instance = Taxi_MDP(T, P, D)
-	policy_finder = Policy()
+	# T , P, D = (4, 3), (4,0), (0, 0)
+	# instance = Taxi_MDP(T, P, D)
+	# policy_finder = Policy()
 	# print(instance.startState)
 
 
@@ -700,22 +791,27 @@ def main():
 	# instance.simulate(policy)
 
 
-
+	# temp_policy = {state : np.random.randint(low = 0 , high = 6) for state in instance.states}
 	# utilities, policy = policy_finder.policy_iteration(instance, temp_policy, 0.99, 1e-8, 1)
-	# instance.simulate(policy)
+	# isn = Taxi_MDP(T, P, D)
+	# temp_policy1 = {state : np.random.randint(low = 0 , high = 6) for state in instance.states}
+
+	# u, p = policy_finder.policy_iteration(isn, temp_policy1, 0.99, 1e-18, 0)
+
+	# instance.simulate(p)
 
 	## Evaluating the episodes while learning ## (remove) 
 
 	#### Q Learning ####
-	print("Q Learning")
-	start = time.time()
-	temp_policy = {state : np.random.randint(low = 0 , high = 6) for state in instance.states}	
-	# destx, desty = input("Enter Destination Coordinates: ")
+	# print("Q Learning")
+	# start = time.time()
+	# temp_policy = {state : np.random.randint(low = 0 , high = 6) for state in instance.states}	
+	# # # # destx, desty = input("Enter Destination Coordinates: ")
 	
-	policy = policy_finder.SARSA(D,temp_policy,0.25,0.99,0.1, decaying_epsilon = True)
-	instance.simulate(policy[0])
+	# policy = policy_finder.q_learning(D,temp_policy,0.25,0.99,0.1, decaying_epsilon = False)
+	# instance.simulate(policy[0])
 
-	print(time.time()-start)
+	# print(time.time()-start)
 
 	# #### Q Learning with decaying exploration rate ####
 	# print("Q Learning with decaying exploration rate")
@@ -746,19 +842,4 @@ def main():
 if __name__ == "__main__":
     main()
 					
-					
-
-
-
-
-
-
-
-
-
-
-		
-
-
-		
 

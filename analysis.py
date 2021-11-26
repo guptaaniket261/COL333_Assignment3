@@ -11,9 +11,9 @@ def main():
     ques = input("Enter Part (A or B), Question number and part number. Example: A 3 b\n").strip().split()
     part = ques[0]
     ques_num = ques[1]
-    sub_part = ques[2]
     if part == "A":
         if ques_num == "2":
+            sub_part = ques[2]
             if sub_part == "a":
                 policy = policy_obj.value_iteration(instance,1e-6,0.9)
                 instance.simulate(policy)
@@ -40,15 +40,17 @@ def main():
                 instance.simulate(policy_2)
 
         if ques_num == "3":
+            sub_part = ques[2]
+            instance = A3.Taxi_MDP()
             if sub_part == "a":
-                discount = 0.9
+                discount = 0.1
                 print("Policy Iteration using Iterative Evaluation Method ")
                 policy = {state: 0 for state in instance.states}
                 utilities, learned_policy = policy_obj.policy_iteration(instance,policy, discount, iterative=1)
                 instance.simulate(learned_policy)
 
                 print("Policy Iteration using Linear Algebraic Evaluation Method ")
-                policy = {state: 0 for state in instance.states}
+                policy = {state : np.random.randint(low = 0 , high = 6) for state in instance.states}
                 utilities, learned_policy = policy_obj.policy_iteration(instance,policy, discount)
                 instance.simulate(learned_policy)
 
@@ -62,22 +64,38 @@ def main():
                     utilities_after_eval,l_policy = policy_obj.policy_iteration(instance,policy,discount,iterative=1,calc_loss = True,opt_utilities = utilities)
     if part == "B":
         if ques_num == "2":
-            episodes = 2000
+
             alpha = 0.25
             discount = 0.99
-            print("Q Learning: ")
+            epsilon = 0.1
+            batch_size = 10
+            nums_episodes = [2000,2500,3000,3500,4000,4500,5000]
+
+            #### Q Learning ####
+            print("Q Learning")
             start = time.time()
-            temp_policy = {state : np.random.randint(low = 0 , high = 6) for state in instance.states}	
             dest = (0, 4)
-            policy, utility = policy_obj.q_learning(dest,temp_policy, alpha=0.25, discount=0.99, epsilon=0.1, num_episodes=500, decaying_epsilon= False, max_steps= 500)
-            print()
-            # print("Simulation - ")
-            # instance.simulate(policy)
+            mean_discounted_rewards = []
+            for num_episodes in nums_episodes:
+                averaged_sum = 0
+                for i in range(batch_size):
+                    p_loc,t_loc = policy_obj.getRandStart(dest)
+                    instance = A3.Taxi_MDP(t_loc, p_loc, dest)
+                    temp_policy = {state : np.random.randint(low = 0 , high = 6) for state in instance.states}	
+                    policy, utility = policy_obj.q_learning(dest,temp_policy, alpha=alpha, discount=discount, epsilon=epsilon, num_episodes=2000, decaying_epsilon= False, max_steps= 500)
+                    averaged_sum += utility
+                averaged_sum /= batch_size
+                mean_discounted_rewards.append(averaged_sum)
+
+            plt.title("Discounted reward sum vs no. of episodes (Queue Learning)" )
+            plt.plot(nums_episodes,mean_discounted_rewards)
+            plt.savefig("Queue Learning")
+            plt.show()
+
+            print("Simulation - ")
+            instance.simulate(policy)
             print("Time taken: ", time.time()-start)
             print("\n")
-
-            print("Q Learning with decaying exploration: ")
-            start = time.time()
 
 
         if ques_num == "3":
@@ -85,10 +103,18 @@ def main():
         if ques_num == "4":
             return
         if ques_num == "5":
+            dest = (0,5)
+            p_loc,t_loc = policy_obj.getRandStart(dest,True)
+            instance = A3.Taxi_MDP(t_loc, p_loc, dest,bigger_grid = True)
+            temp_policy = {state : np.random.randint(low = 0 , high = 6) for state in instance.states}	
+            policy, utility = policy_obj.q_learning(dest,temp_policy, alpha=0.25, discount=0.1, epsilon=1e-18, num_episodes=2000, decaying_epsilon= False, max_steps= 1500,bigger_grid = True)
+            instance.simulate(policy)
+            print(utility)
+
             return
         
 
-#main()
+main()
 
 
 
@@ -124,7 +150,7 @@ for discount in discounts:
     instance.simulate(learned_policy)
     policy = {state: 0 for state in instance.states}
     utilities_after_eval,l_policy = policy_obj.policy_iteration(instance,policy,discount,iterative=1,calc_loss = True,opt_utilities = utilities)
-'''
+
 instance = A3.Taxi_MDP()
 policy_obj = A3.Policy()
    
@@ -140,7 +166,7 @@ print(instance.currState)
 print(instance.destState)
 learned_policy, discounted_reward = policy_obj.q_learning(instance,policy,alpha,discount,epsilon)
 instance.simulate(learned_policy)
-'''
+
 #### Q Learning ####
 print("Q Learning")
 start = time.time()
