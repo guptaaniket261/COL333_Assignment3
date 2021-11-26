@@ -61,7 +61,7 @@ def main():
                     policy = {state: 0 for state in instance.states}
                     utilities_after_eval,l_policy = policy_obj.policy_iteration(instance,policy,discount,iterative=1,calc_loss = True,opt_utilities = utilities)
 
-main()
+#main()
 
 
 
@@ -97,7 +97,10 @@ for discount in discounts:
     instance.simulate(learned_policy)
     policy = {state: 0 for state in instance.states}
     utilities_after_eval,l_policy = policy_obj.policy_iteration(instance,policy,discount,iterative=1,calc_loss = True,opt_utilities = utilities)
-
+'''
+instance = A3.Taxi_MDP()
+policy_obj = A3.Policy()
+   
 alpha = 0.6
 discount = 1.0
 epsilon = 0.1
@@ -110,7 +113,7 @@ print(instance.currState)
 print(instance.destState)
 learned_policy, discounted_reward = policy_obj.q_learning(instance,policy,alpha,discount,epsilon)
 instance.simulate(learned_policy)
-
+'''
 #### Q Learning ####
 print("Q Learning")
 start = time.time()

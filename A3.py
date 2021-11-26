@@ -505,7 +505,10 @@ class Policy:
 		q_table = {state: {action: 0 for action in range(6)} for state in MDP.states}
 		iteration = 1
 		for episode in range(num_episodes):
-			# state = MDP.get_rand_start() 
+			state = MDP.get_rand_start() 
+			row_d,col_d,row_d,col_d,inside_taxi = decode(MDP.destState)
+			row_p,col_p,row_t,col_t,inside_taxi = decode(state)
+			MDP = Taxi_MDP(T = (row_t,col_t),P_pos = (row_p,col_p), D = (row_d,col_d))
 			state = MDP.startState
 			done = False
 			num_steps = 0
