@@ -44,7 +44,7 @@ def evaluate(q_table, states, batch_size, discount):
 		learned_policy[state] = max(q_table[state], key= lambda action: q_table[state][action])
 	for i in range(batch_size):
 		test_mdp = Taxi_MDP() 
-		test_mdp.get_rand_start()
+		#test_mdp.get_rand_start()
 		rewards = test_mdp.simulate(learned_policy,verbose = False)
 		disc_sum_reward = 0
 		factor = 1
@@ -312,7 +312,7 @@ class Taxi_MDP:
 		rewards = []
 		A = {0 :"S", 1: "N", 2: "E", 3: "W", 4: "Pickup", 5: "Putdown"}
 		while(self.currState !=self.destState):
-			if steps > 30:
+			if steps > 500:
 				break
 			steps += 1
 			prev_state = self.currState
@@ -326,17 +326,18 @@ class Taxi_MDP:
 			action_taken = A[policy[prev_state]]
 			if verbose:
 				print("CurrTaxi: {0}, CurrPass: {1}, Inside:{2}, action: {3}, prob: {4}, reward: {5}, NewTaxi: {6}, NewPass: {7}, Inside:{8}".format(prev_T, prev_P, inside_taxi, action_taken, prob, reward,new_T, new_P, n_inside_taxi ))
+				#print("CurrT: {0}, CurrP: {1}, In:{2}, A: {3}, P: {4}, R: {5}, NewT: {6}, NewP: {7}, In:{8}".format(prev_T, prev_P, inside_taxi, action_taken, prob, reward,new_T, new_P, n_inside_taxi ))
 			rewards.append(reward)
 		return rewards
 
 	def get_rand_start(self):
-		r = np.random.randint(low = 0, high = 4)
-		row_p, col_p = self.p_locs[r]
-		row_t = np.random.randint(low = 0, high = 4)
-		col_t = np.random.randint(low = 0, high = 4)
-		while row_t == row_p and col_p == col_t:
-			row_t = np.random.randint(low = 0, high = 4)
-			col_t = np.random.randint(low = 0, high = 4)	
+		row_pd,col_pd, row_td,col_td,inside_taxi_d = decode(self.destState)
+		row_p,col_p = row_pd,col_pd
+		while row_p == row_pd and col_p == col_pd:
+			r = np.random.randint(low = 0, high = 4)
+			row_p, col_p = self.p_locs[r]
+		row_t = np.random.randint(low = 0, high = 5)
+		col_t = np.random.randint(low = 0, high = 5)	
 		inside_taxi = 0
 		start_state = encode(row_p, col_p, row_t, col_t, inside_taxi)
 		self.startState = start_state
@@ -380,6 +381,10 @@ class Policy:
 			if delta < epsilon:
 				converged = True
 		plt.plot(iter_array, max_norm_array)
+		plt.title("Value Iteration, epsilon = " + str(epsilon) + ", discount = "+str(discount) )
+		plt.xlabel("Number of iterations")
+		plt.ylabel("Max Norm value")
+		plt.savefig("Val_iter_d_" + str(int(discount*100)))
 		plt.show()
 		
 		for state in MDP.states:
@@ -479,20 +484,26 @@ class Policy:
 			action = np.random.randint(low=0,high=6)
 		return action
 
-	def q_learning(self,MDP,policy,alpha,discount,epsilon,num_episodes=2000,decaying_epsilon = False,max_steps = 500):
+	def q_learning(self,MDP,policy,alpha,discount,epsilon,num_episodes=200,decaying_epsilon = False,max_steps = 500):
 		q_table = {state: {action: 0 for action in range(6)} for state in MDP.states}
 		iteration = 1
-		rewards = []
-		episodes = []
 		for episode in range(num_episodes):
-			state = MDP.get_rand_start() 
+			# state = MDP.get_rand_start() 
+			state = MDP.startState
 			done = False
 			num_steps = 0
-			while (not done) and num_steps < max_steps:
+			while (not done):
+				if num_steps>max_steps:
+					print("here")
+					break
 				action = self.epsilon_greedy(policy[state], epsilon, iteration, decaying_epsilon)
+				#print(action)
 				transition, reward = MDP.step(action)   ## transition = prob, next_state
 				next_state = transition[1]   ## same as MDP.currState
+				#print(next_state,reward)
 				next_opt_action = max(q_table[next_state], key= lambda action: q_table[next_state][action])
+				# print(q_table)
+				#print(next_opt_action)
 				td_update_sample = reward + discount * q_table[next_state][next_opt_action] 
 				q_table[state][action] = (1-alpha) * q_table[state][action] +  alpha * td_update_sample
 				iteration += 1
@@ -500,22 +511,20 @@ class Policy:
 					done = True
 				state = next_state
 				num_steps += 1
-			##### Calculate discounted sum of rewards for this episode, averaged over 10 runs #####
-			curr_score = evaluate(q_table,MDP.states,10,discount)
-			rewards.append(curr_score)  
-			episodes.append(episode)
-		# plt.plot(episodes,rewards)
-		# if decaying_epsilon:
-		# 	plt.title("Discounted rewards vs no. of episodes (Q Learning with decaying exploration rate)")	
-		# 	plt.savefig("Q_Learning_2")	
-		# else:
-		# 	plt.title("Discounted rewards vs no. of episodes (Q Learning)")	
-		# 	plt.savefig("Q_Learning")	
-		# plt.show()
+				for state in MDP.states:
+					policy[state] = max(q_table[state], key= lambda action: q_table[state][action])
+			
+			####   Calculate discounted sum of rewards for this episode, averaged over 10 runs  #####
+			# curr_score = evaluate(q_table,MDP.states,10,discount)
+			# rewards.append(curr_score)  
+			# episodes.append(episode)
+
 		learned_policy = {state : -1 for state in MDP.states}
 		for state in MDP.states:
 			learned_policy[state] = max(q_table[state], key= lambda action: q_table[state][action])
-		return learned_policy, rewards[-1]
+		utility = evaluate(q_table,MDP.states,1,discount)
+		print(utility)		
+		return learned_policy, utility
 
 
 	def SARSA(self,MDP,policy,alpha,discount,epsilon,num_episodes=2000,decaying_epsilon = False,max_steps=500):
@@ -539,19 +548,13 @@ class Policy:
 					done = True
 				state = next_state
 				num_steps+=1
+				for state in MDP.states:
+					policy[state] = max(q_table[state], key= lambda action: q_table[state][action])
 
 			##### Calculate discounted sum of rewards for this episode, averaged over 10 runs #####
-			curr_score = evaluate(q_table,MDP.states,10,discount)
-			rewards.append(curr_score)  
-			episodes.append(episode)
-		# plt.plot(episodes,rewards)
-		# if decaying_epsilon:
-		# 	plt.title("Discounted rewards vs no. of episodes (SARSA, decaying exploration rate )")
-		# 	plt.savefig("SARSA_2")
-		# else:
-		# 	plt.title("Discounted rewards vs no. of episodes (SARSA)")
-		# 	plt.savefig("SARSA")
-		# plt.show()			
+			# curr_score = evaluate(q_table,MDP.states,10,discount)
+			# rewards.append(curr_score)  
+			# episodes.append(episode)			
 
 		learned_policy = {state : -1 for state in MDP.states}
 		for state in MDP.states:
