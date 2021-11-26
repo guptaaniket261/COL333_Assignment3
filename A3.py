@@ -42,6 +42,7 @@ def evaluate(q_table, states, batch_size, discount):
 	learned_policy = {state : -1 for state in states}
 	for state in states:
 		learned_policy[state] = max(q_table[state], key= lambda action: q_table[state][action])
+	# print(learned_policy)
 	for i in range(batch_size):
 		test_mdp = Taxi_MDP() 
 		#test_mdp.get_rand_start()
@@ -52,6 +53,7 @@ def evaluate(q_table, states, batch_size, discount):
 			disc_sum_reward += factor*rewards[j]
 			factor *= discount
 		disc_sum_rewards.append(disc_sum_reward)
+	print(disc_sum_reward)
 	averaged_sum = sum(disc_sum_rewards) / batch_size
 	return averaged_sum
 
@@ -484,24 +486,46 @@ class Policy:
 			action = np.random.randint(low=0,high=6)
 		return action
 
-	def q_learning(self,MDP,policy,alpha,discount,epsilon,num_episodes=200,decaying_epsilon = False,max_steps = 500):
+	
+	def getRandStart(self, destination):
+		row_t = np.random.randint(low = 0, high = 5)
+		col_t = np.random.randint(low = 0, high = 5)
+		p_locs = [(0,0),(0,4),(4,0),(4,3)]
+		found = False
+		loc = (0, 0)
+		while( not found):
+			r = np.random.randint(low = 0, high = 4)
+			loc = p_locs[r]
+			if loc!=destination:
+				break
+		return loc, (row_t, col_t)
+
+
+	def q_learning(self,MDP,policy,alpha,discount,epsilon,num_episodes=500,decaying_epsilon = False,max_steps = 500):
+		# print(policy)
 		q_table = {state: {action: 0 for action in range(6)} for state in MDP.states}
 		iteration = 1
+		rewards, episodes = [], []
 		for episode in range(num_episodes):
 			# state = MDP.get_rand_start() 
+			dest = (0, 4)
+			p_loc, t_loc = self.getRandStart(dest)
+			MDP = Taxi_MDP(t_loc, p_loc, dest)
+			# MDP.currState = MDP.startState
 			state = MDP.startState
 			done = False
 			num_steps = 0
 			while (not done):
 				if num_steps>max_steps:
-					print("here")
+					print(episode)
 					break
 				action = self.epsilon_greedy(policy[state], epsilon, iteration, decaying_epsilon)
 				#print(action)
 				transition, reward = MDP.step(action)   ## transition = prob, next_state
 				next_state = transition[1]   ## same as MDP.currState
 				#print(next_state,reward)
-				next_opt_action = max(q_table[next_state], key= lambda action: q_table[next_state][action])
+				# next_opt_action = max(q_table[next_state], key= lambda action: q_table[next_state][action])
+				next_opt_action = policy[next_state]
 				# print(q_table)
 				#print(next_opt_action)
 				td_update_sample = reward + discount * q_table[next_state][next_opt_action] 
@@ -509,20 +533,25 @@ class Policy:
 				iteration += 1
 				if next_state == MDP.destState:
 					done = True
+					print("Reached")
 				state = next_state
 				num_steps += 1
-				for state in MDP.states:
-					policy[state] = max(q_table[state], key= lambda action: q_table[state][action])
+				# for state in MDP.states:
+					# policy[state] = max(q_table[state], key= lambda action: q_table[state][action])
+				policy[state] = max(q_table[state], key= lambda action: q_table[state][action])
+				
 			
 			####   Calculate discounted sum of rewards for this episode, averaged over 10 runs  #####
-			# curr_score = evaluate(q_table,MDP.states,10,discount)
-			# rewards.append(curr_score)  
-			# episodes.append(episode)
+			curr_score = evaluate(q_table,MDP.states,10,discount)
+			rewards.append(curr_score)  
+			episodes.append(episode)
 
+		plt.plot(episodes, rewards)
+		plt.show()
 		learned_policy = {state : -1 for state in MDP.states}
 		for state in MDP.states:
 			learned_policy[state] = max(q_table[state], key= lambda action: q_table[state][action])
-		utility = evaluate(q_table,MDP.states,1,discount)
+		utility = evaluate(q_table,MDP.states,10,discount)
 		print(utility)		
 		return learned_policy, utility
 
@@ -559,7 +588,7 @@ class Policy:
 		learned_policy = {state : -1 for state in MDP.states}
 		for state in MDP.states:
 			learned_policy[state] = max(q_table[state], key= lambda action: q_table[state][action])
-		return learned_policy, rewards[-1]
+		return learned_policy
 		
 
 def main():
@@ -573,7 +602,7 @@ def main():
 	# for discount in discounts:
 	# 	policy = po.value_iteration(a, 1e-18, discount)
 	
-	T , P, D = (3,0), (0,4), (0,0)
+	T , P, D = (3,0), (0,0), (0,4)
 	instance = Taxi_MDP(T, P, D)
 	policy_finder = Policy()
 	# print(instance.startState)
@@ -594,30 +623,33 @@ def main():
 	#### Q Learning ####
 	print("Q Learning")
 	start = time.time()
-	temp_policy = {state : 0 for state in instance.states}	
-	policy = policy_finder.q_learning(instance,temp_policy,0.25,0.99,1e-18)
+	temp_policy = {state : np.random.randint(low = 0 , high = 6) for state in instance.states}	
+	policy = policy_finder.q_learning(instance,temp_policy,0.25,0.99,0.1)
+	print(policy)
+	instance.simulate(policy[0])
+
 	print(time.time()-start)
 
-	#### Q Learning with decaying exploration rate ####
-	print("Q Learning with decaying exploration rate")
-	start = time.time()
-	temp_policy = {state : 0 for state in instance.states}	
-	policy = policy_finder.q_learning(instance,temp_policy,0.25,0.99,1e-18,decaying_epsilon=True)
-	print(time.time()-start)
+	# #### Q Learning with decaying exploration rate ####
+	# print("Q Learning with decaying exploration rate")
+	# start = time.time()
+	# temp_policy = {state : 0 for state in instance.states}	
+	# policy = policy_finder.q_learning(instance,temp_policy,0.25,0.99,1e-18,decaying_epsilon=True)
+	# print(time.time()-start)
 	
-	#### SARSA ####
-	print("SARSA")
-	start = time.time()
-	temp_policy = {state : 0 for state in instance.states}	
-	policy = policy_finder.SARSA(instance,temp_policy,0.25,0.99,1e-18)
-	print(time.time()-start)
+	# #### SARSA ####
+	# print("SARSA")
+	# start = time.time()
+	# temp_policy = {state : 0 for state in instance.states}	
+	# policy = policy_finder.SARSA(instance,temp_policy,0.25,0.99,1e-18)
+	# print(time.time()-start)
 
-	#### SARSA with decaying exploration rate ####
-	print("SARSA with decaying exploration rate")
-	start = time.time()
-	temp_policy = {state : 0 for state in instance.states}	
-	policy = policy_finder.SARSA(instance,temp_policy,0.25,0.99,1e-18,decaying_epsilon=True)
-	print(time.time()-start)
+	# #### SARSA with decaying exploration rate ####
+	# print("SARSA with decaying exploration rate")
+	# start = time.time()
+	# temp_policy = {state : 0 for state in instance.states}	
+	# policy = policy_finder.SARSA(instance,temp_policy,0.25,0.99,1e-18,decaying_epsilon=True)
+	# print(time.time()-start)
 
 
 	# print(policy)
