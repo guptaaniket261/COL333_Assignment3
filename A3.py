@@ -61,7 +61,7 @@ def evaluate(q_table, states, batch_size, discount, dest,bigger_grid = False):
 	for state in states:
 		learned_policy[state] = max(q_table[state], key= lambda action: q_table[state][action])
 	for i in range(batch_size):
-		p_loc, t_loc = getRandStart(dest)
+		p_loc, t_loc = getRandStart(dest, bigger_grid)
 		test_mdp = Taxi_MDP(t_loc, p_loc, D = dest, bigger_grid=bigger_grid) 
 		rewards = test_mdp.simulate(learned_policy,verbose = False)
 		disc_sum_reward = 0
@@ -113,7 +113,7 @@ class Taxi_MDP:
 		self.num_rows = 5
 		self.num_cols = 5
 		self.bigger_grid = bigger_grid
-
+		# print(bigger_grid)
 		if bigger_grid:
 			self.p_locs = [ (0,0),(0,5),(0,8),(3,3),(4,6),(8,0),(9,4),(9,9) ]
 			self.num_rows = 10
@@ -344,8 +344,8 @@ class Taxi_MDP:
 			new_P , new_T = (new_Px, new_Py), (new_Tx, new_Ty)
 			action_taken = A[policy[prev_state]]
 			if verbose:
-				print("CurrTaxi: {0}, CurrPass: {1}, Inside:{2}, action: {3}, prob: {4}, reward: {5}, NewTaxi: {6}, NewPass: {7}, Inside:{8}".format(prev_T, prev_P, inside_taxi, action_taken, prob, reward,new_T, new_P, n_inside_taxi ))
-				#print("Taxi: {0}, Passenger: {1}, Inside_taxi:{2}, Action: {3}".format(prev_T, prev_P, inside_taxi, action_taken ))
+				# print("CurrTaxi: {0}, CurrPass: {1}, Inside:{2}, action: {3}, prob: {4}, reward: {5}, NewTaxi: {6}, NewPass: {7}, Inside:{8}".format(prev_T, prev_P, inside_taxi, action_taken, prob, reward,new_T, new_P, n_inside_taxi ))
+				print("Taxi: {0}, Passenger: {1}, Inside_taxi:{2}, Action: {3}".format(prev_T, prev_P, inside_taxi, action_taken ))
 			rewards.append(reward)
 		return rewards
 
@@ -603,12 +603,13 @@ class Policy:
 		return learned_policy, utility
 
 
-	def SARSA(self,dest,policy,alpha,discount,epsilon,num_episodes=1500,decaying_epsilon = False,max_steps=500,bigger_grid = False):
+	def SARSA(self,dest,policy,alpha,discount,epsilon,num_episodes=2500,decaying_epsilon = False,max_steps=500,bigger_grid = False):
 		MDP = Taxi_MDP(bigger_grid=bigger_grid)
 		q_table = {state: {action: 0 for action in range(6)} for state in MDP.states}
 		iteration = 1
 		rewards, episodes = [], []
 		for episode in range(num_episodes): 
+			print(episode)
 			p_loc, t_loc = self.getRandStart(dest,bigger_grid)
 			MDP = Taxi_MDP(t_loc, p_loc, dest,bigger_grid)
 			prev_state = MDP.startState
@@ -640,7 +641,8 @@ class Policy:
 				policy[prev_state] = max(q_table[prev_state], key= lambda action: q_table[prev_state][action])				
 			
 			####   Calculate discounted sum of rewards for this episode, averaged over 10 runs  #####
-			curr_score = evaluate( q_table,MDP.states,10,discount, dest,bigger_grid)
+			# print(bigger_grid)
+			curr_score = evaluate( q_table,MDP.states,10,discount, dest, bigger_grid)
 			rewards.append(curr_score)  
 			episodes.append(episode)
 
@@ -818,18 +820,17 @@ def main():
 				policy, utility = policy_obj.q_learning(dest,temp_policy, a, 0.99, 0.1, decaying_epsilon = False)
 
 		if args[1] == "5":
-			dest = (0, 0)
 			depots = [ (0,0),(0,5),(0,8),(3,3),(4,6),(8,0),(9,4),(9,9) ]
 			for i in range(5):
+				t = np.random.randint(low = 0, high = 8)
+				dest = depots[t]
 				p_loc,t_loc = policy_obj.getRandStart(dest,True)
+				print("Passenger: {0}, Taxi: {1}, Destination: {2}".format(p_loc, t_loc, dest))
 				instance = Taxi_MDP(t_loc, p_loc, dest,bigger_grid = True)
 				temp_policy = {state : np.random.randint(low = 0 , high = 6) for state in instance.states}	
-				policy, utility = policy_obj.q_learning(dest,temp_policy, alpha=0.25, discount=0.99, epsilon=1e-18, num_episodes=2000, decaying_epsilon= False, max_steps= 1500,bigger_grid = True)
-				# instance.simulate(policy)
-				print(utility)
-
-
-		
+				policy, utility = policy_obj.SARSA(dest, temp_policy, 0.25, 0.99, 0.1, num_episodes = 2000, max_steps = 500, decaying_epsilon = True, bigger_grid=True)
+				instance.simulate(policy)
+				# print(utility)
 
 
 
