@@ -345,7 +345,7 @@ class Taxi_MDP:
 			action_taken = A[policy[prev_state]]
 			if verbose:
 				print("CurrTaxi: {0}, CurrPass: {1}, Inside:{2}, action: {3}, prob: {4}, reward: {5}, NewTaxi: {6}, NewPass: {7}, Inside:{8}".format(prev_T, prev_P, inside_taxi, action_taken, prob, reward,new_T, new_P, n_inside_taxi ))
-				#print("CurrT: {0}, CurrP: {1}, In:{2}, A: {3}, P: {4}, R: {5}, NewT: {6}, NewP: {7}, In:{8}".format(prev_T, prev_P, inside_taxi, action_taken, prob, reward,new_T, new_P, n_inside_taxi ))
+				#print("Taxi: {0}, Passenger: {1}, Inside_taxi:{2}, Action: {3}".format(prev_T, prev_P, inside_taxi, action_taken ))
 			rewards.append(reward)
 		return rewards
 
@@ -690,14 +690,47 @@ def main():
 				MDP1 = Taxi_MDP((tx, ty), (px, py), (dx, dy))
 				print("Discount : 0.1")
 				policy1 = policy_obj.value_iteration(MDP1, 1e-18, 0.1)
-				MDP2 = Taxi_MDP((tx, ty), (px, py), (dx, dy))
 				MDP1.simulate(policy1)
 				print("\n")
 
+				MDP2 = Taxi_MDP((tx, ty), (px, py), (dx, dy))
 				print("Discount : 0.99")
 				policy2 = policy_obj.value_iteration(MDP2, 1e-18, 0.99)
 				MDP2.simulate(policy2)
+				print("\n")
 			
+				print("After sampling start states")
+				p_loc, t_loc = policy_obj.getRandStart((dx,dy))
+				print("Taxi start position: " + str(t_loc))
+				print("Passenger start position: " + str(p_loc))
+				MDP1 = Taxi_MDP(t_loc, p_loc, (dx, dy))
+				print("Discount : 0.1")
+				policy1 = policy_obj.value_iteration(MDP1, 1e-18, 0.1)
+				MDP1.simulate(policy1)
+				print("\n")
+
+				MDP2 = Taxi_MDP(t_loc, p_loc, (dx, dy))
+				print("Discount : 0.99")
+				policy2 = policy_obj.value_iteration(MDP2, 1e-18, 0.99)
+				MDP2.simulate(policy2)
+				print("\n")
+
+				p_loc, t_loc = policy_obj.getRandStart((dx,dy))
+				print("Taxi start position: " + str(t_loc))
+				print("Passenger start position: " + str(p_loc))
+				MDP1 = Taxi_MDP(t_loc, p_loc, (dx, dy))
+				print("Discount : 0.1")
+				policy1 = policy_obj.value_iteration(MDP1, 1e-18, 0.1)
+				MDP1.simulate(policy1)
+				print("\n")
+
+				MDP2 = Taxi_MDP(t_loc, p_loc, (dx, dy))
+				print("Discount : 0.99")
+				policy2 = policy_obj.value_iteration(MDP2, 1e-18, 0.99)
+				MDP2.simulate(policy2)
+				print("\n")				
+
+
 		if args[1] == "3":
 			if args[2] == "a":
 				print("Iterative Method: ")
@@ -705,6 +738,7 @@ def main():
 				temp_policy1 = {state : np.random.randint(low = 0 , high = 6) for state in MDP1.states}
 				utility, policy1 = policy_obj.policy_iteration(MDP1, temp_policy1, 0.99, 1e-18, 1)
 				MDP1.simulate(policy1)
+				print(utility)
 
 				print("\n")
 				print("Linear Algebra Method: ")
@@ -712,6 +746,7 @@ def main():
 				temp_policy2 = {state : np.random.randint(low = 0 , high = 6) for state in MDP2.states}
 				utility, policy2 = policy_obj.policy_iteration(MDP2, temp_policy2, 0.99, 1e-12, 1)
 				MDP2.simulate(policy2)
+				print(utility)
 
 
 			if args[2] == "b":
