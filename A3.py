@@ -761,8 +761,14 @@ def main():
 		if args[1] == "4":
 			pass
 		if args[1] == "5":
-			pass
-		
+			dest = (0,5)
+			p_loc,t_loc = policy_obj.getRandStart(dest,True)
+			instance = Taxi_MDP(t_loc, p_loc, dest,bigger_grid = True)
+			temp_policy = {state : np.random.randint(low = 0 , high = 6) for state in instance.states}	
+			policy, utility = policy_obj.q_learning(dest,temp_policy, alpha=0.25, discount=0.99, epsilon=1e-18, num_episodes=2000, decaying_epsilon= False, max_steps= 1500,bigger_grid = True)
+			instance.simulate(policy)
+			print(utility)
+
 
 		
 
