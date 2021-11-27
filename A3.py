@@ -547,7 +547,7 @@ class Policy:
 		return loc, (row_t, col_t)
 
 
-	def q_learning(self,dest,policy,alpha,discount,epsilon,num_episodes = 2500, decaying_epsilon = False, max_steps = 500,bigger_grid=False):
+	def q_learning(self,dest,policy,alpha,discount,epsilon,num_episodes = 2000, decaying_epsilon = False, max_steps = 500,bigger_grid=False):
 		MDP = Taxi_MDP(bigger_grid = bigger_grid)
 		q_table = {state: {action: 0 for action in range(6)} for state in MDP.states}
 		iteration = 1
@@ -560,7 +560,7 @@ class Policy:
 			num_steps = 0
 			while (not done):
 				if num_steps>max_steps:
-					print(episode)
+					# print(episode)
 					break
 				action = self.epsilon_greedy(policy[state], epsilon, iteration, decaying_epsilon)
 				transition, reward = MDP.step(action)   ## transition = prob, next_state
@@ -586,10 +586,10 @@ class Policy:
 		plt.ylabel("Accumulated Reward (averaged over 10 different runs)")
 		if decaying_epsilon:
 			plt.title("Q-learning with decaying exploration rate")
-			plt.savefig("q_learning_decay")
+			plt.savefig("q_learning_decay_{0}_{1}".format(int(alpha*10), int(epsilon*100)))
 		else:
 			plt.title("Q-learning with fixed exploration rate")
-			plt.savefig("q_learning")
+			plt.savefig("q_learning_{0}_{1}".format(int(alpha*10), int(epsilon*100)))
 		plt.show()
 		
 		learned_policy = {state : -1 for state in MDP.states}
@@ -748,7 +748,7 @@ def main():
 
 			temp_policy = {state : np.random.randint(low = 0 , high = 6) for state in MDP.states}
 			policy, utility = policy_obj.SARSA(dest, temp_policy, 0.25, 0.99, 0.1, decaying_epsilon = False)
-			print("Accumulated reward with SARSA (decaying eps): ", utility)
+			print("Accumulated reward with SARSA (fixed eps): ", utility)
 			print("\n")
 
 			temp_policy = {state : np.random.randint(low = 0 , high = 6) for state in MDP.states}
@@ -757,17 +757,41 @@ def main():
 			print("\n")
 
 		if args[1] == "3":
-			pass
+			dest = (0, 0)
+			MDP = Taxi_MDP()
+			temp_policy = {state : np.random.randint(low = 0 , high = 6) for state in MDP.states}
+			policy, utility = policy_obj.SARSA(dest, temp_policy, 0.25, 0.99, 0.1, decaying_epsilon = True)
+			for i in range(5):
+				p_loc, t_loc = getRandStart(dest)
+				print("Passenger: {0}, Taxi: {1}, Destination: {2}".format(p_loc, t_loc, dest))
+				instance = Taxi_MDP(t_loc, p_loc, dest)
+				instance.simulate(policy)
+				print("\n")
+
+
 		if args[1] == "4":
-			pass
+			dest = (0, 0)
+			eps = [0, 0.05, 0.1, 0.5, 0.9]
+			alpha = [0.1, 0.2, 0.3, 0.4, 0.5]
+			MDP = Taxi_MDP()
+			for e in eps:
+				temp_policy = {state : np.random.randint(low = 0 , high = 6) for state in MDP.states}
+				policy, utility = policy_obj.q_learning(dest,temp_policy, 0.1, 0.99, e, decaying_epsilon = False)
+
+			for a in alpha:
+				temp_policy = {state : np.random.randint(low = 0 , high = 6) for state in MDP.states}
+				policy, utility = policy_obj.q_learning(dest,temp_policy, a, 0.99, 0.1, decaying_epsilon = False)
+
 		if args[1] == "5":
-			dest = (0,5)
-			p_loc,t_loc = policy_obj.getRandStart(dest,True)
-			instance = Taxi_MDP(t_loc, p_loc, dest,bigger_grid = True)
-			temp_policy = {state : np.random.randint(low = 0 , high = 6) for state in instance.states}	
-			policy, utility = policy_obj.q_learning(dest,temp_policy, alpha=0.25, discount=0.99, epsilon=1e-18, num_episodes=2000, decaying_epsilon= False, max_steps= 1500,bigger_grid = True)
-			instance.simulate(policy)
-			print(utility)
+			dest = (0, 0)
+			depots = [ (0,0),(0,5),(0,8),(3,3),(4,6),(8,0),(9,4),(9,9) ]
+			for i in range(5):
+				p_loc,t_loc = policy_obj.getRandStart(dest,True)
+				instance = Taxi_MDP(t_loc, p_loc, dest,bigger_grid = True)
+				temp_policy = {state : np.random.randint(low = 0 , high = 6) for state in instance.states}	
+				policy, utility = policy_obj.q_learning(dest,temp_policy, alpha=0.25, discount=0.99, epsilon=1e-18, num_episodes=2000, decaying_epsilon= False, max_steps= 1500,bigger_grid = True)
+				# instance.simulate(policy)
+				print(utility)
 
 
 		
