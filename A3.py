@@ -609,7 +609,7 @@ class Policy:
 		iteration = 1
 		rewards, episodes = [], []
 		for episode in range(num_episodes): 
-			print(episode)
+			# print(episode)
 			p_loc, t_loc = self.getRandStart(dest,bigger_grid)
 			MDP = Taxi_MDP(t_loc, p_loc, dest,bigger_grid)
 			prev_state = MDP.startState
@@ -832,78 +832,6 @@ def main():
 				instance.simulate(policy)
 				# print(utility)
 
-
-
-
-	# a = Taxi_MDP()
-	# po = Policy()
-	# eps = [1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-18]
-	# for epsilon in eps:
-	# 	policy = po.value_iteration(a, epsilon, 0.9)
-
-	# discounts = [0.01, 0.1, 0.5, 0.8, 0.99]
-	# for discount in discounts:
-	# 	policy = po.value_iteration(a, 1e-18, discount)
-	
-	# T , P, D = (4, 3), (4,0), (0, 0)
-	# instance = Taxi_MDP(T, P, D)
-	# policy_finder = Policy()
-	# print(instance.startState)
-
-
-	# policy = policy_finder.value_iteration(instance, 1e-18, 0.1)
-	# # print(policy[instance.startState])
-	# # print(instance.P[instance.startState][policy[instance.startState]])
-	# instance.simulate(policy)
-
-
-	# temp_policy = {state : np.random.randint(low = 0 , high = 6) for state in instance.states}
-	# utilities, policy = policy_finder.policy_iteration(instance, temp_policy, 0.99, 1e-8, 1)
-	# isn = Taxi_MDP(T, P, D)
-	# temp_policy1 = {state : np.random.randint(low = 0 , high = 6) for state in instance.states}
-
-	# u, p = policy_finder.policy_iteration(isn, temp_policy1, 0.99, 1e-18, 0)
-
-	# instance.simulate(p)
-
-	## Evaluating the episodes while learning ## (remove) 
-
-	#### Q Learning ####
-	# print("Q Learning")
-	# start = time.time()
-	# temp_policy = {state : np.random.randint(low = 0 , high = 6) for state in instance.states}	
-	# # # # destx, desty = input("Enter Destination Coordinates: ")
-	
-	# policy = policy_finder.q_learning(D,temp_policy,0.25,0.99,0.1, decaying_epsilon = False)
-	# instance.simulate(policy[0])
-
-	# print(time.time()-start)
-
-	# #### Q Learning with decaying exploration rate ####
-	# print("Q Learning with decaying exploration rate")
-	# start = time.time()
-	# temp_policy = {state : 0 for state in instance.states}	
-	# policy = policy_finder.q_learning(instance,temp_policy,0.25,0.99,1e-18,decaying_epsilon=True)
-	# print(time.time()-start)
-	
-	# #### SARSA ####
-	# print("SARSA")
-	# start = time.time()
-	# temp_policy = {state : 0 for state in instance.states}	
-	# policy = policy_finder.SARSA(instance,temp_policy,0.25,0.99,1e-18)
-	# print(time.time()-start)
-
-	# #### SARSA with decaying exploration rate ####
-	# print("SARSA with decaying exploration rate")
-	# start = time.time()
-	# temp_policy = {state : 0 for state in instance.states}	
-	# policy = policy_finder.SARSA(instance,temp_policy,0.25,0.99,1e-18,decaying_epsilon=True)
-	# print(time.time()-start)
-
-
-	# print(policy)
-	# a.step(0)
-	# a.step(1)
 	
 if __name__ == "__main__":
     main()
