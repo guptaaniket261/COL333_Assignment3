@@ -344,8 +344,8 @@ class Taxi_MDP:
 			new_P , new_T = (new_Px, new_Py), (new_Tx, new_Ty)
 			action_taken = A[policy[prev_state]]
 			if verbose:
-				# print("CurrTaxi: {0}, CurrPass: {1}, Inside:{2}, action: {3}, prob: {4}, reward: {5}, NewTaxi: {6}, NewPass: {7}, Inside:{8}".format(prev_T, prev_P, inside_taxi, action_taken, prob, reward,new_T, new_P, n_inside_taxi ))
-				print("Taxi: {0}, Passenger: {1}, Inside_taxi:{2}, Action: {3}".format(prev_T, prev_P, inside_taxi, action_taken ))
+				print("CurrTaxi: {0}, CurrPass: {1}, Inside:{2}, action: {3}, prob: {4}, reward: {5}, NewTaxi: {6}, NewPass: {7}, Inside:{8}".format(prev_T, prev_P, inside_taxi, action_taken, prob, reward,new_T, new_P, n_inside_taxi ))
+				# print("Taxi: {0}, Passenger: {1}, Inside_taxi:{2}, Action: {3}".format(prev_T, prev_P, inside_taxi, action_taken ))
 			rewards.append(reward)
 		return rewards
 
@@ -740,7 +740,7 @@ def main():
 				temp_policy1 = {state : np.random.randint(low = 0 , high = 6) for state in MDP1.states}
 				utility, policy1 = policy_obj.policy_iteration(MDP1, temp_policy1, 0.99, 1e-18, 1)
 				MDP1.simulate(policy1)
-				print(utility)
+				# print(utility)
 
 				print("\n")
 				print("Linear Algebra Method: ")
@@ -748,7 +748,7 @@ def main():
 				temp_policy2 = {state : np.random.randint(low = 0 , high = 6) for state in MDP2.states}
 				utility, policy2 = policy_obj.policy_iteration(MDP2, temp_policy2, 0.99, 1e-12, 1)
 				MDP2.simulate(policy2)
-				print(utility)
+				# print(utility)
 
 
 			if args[2] == "b":
